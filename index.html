@@ -1,63 +1,121 @@
-<div>Teachable Machine Image Model</div>
-<button type="button" onclick="init()">Start</button>
-<div id="webcam-container"></div>
-<div id="label-container"></div>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-<script type="text/javascript">
-    // ⚠️ TAMPAL URL MODEL TM KITAK (DARI TEACHABLE MACHINE)
-    // Contoh: const URL_MODEL_TM = "https://teachablemachine.withgoogle.com/models/8T1UNdXAx/";
-    const URL_MODEL_TM = "https://teachablemachine.withgoogle.com/models/8T1UNdXAx/"; 
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMART i-C Online | AI Avengers</title>
     
-    // ⚠️ TAMPAL URL WEB APP GAS KITAK (DARI GAS DEPLOYMENT v1.0)
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzE_Hm9DdGq3ICixBiC_m78B0lnzW7tlQx1UebWT7-rD5kDbp4JN5WqZQbDTZWP8fHH/exec"; 
+    <!-- Kod CSS Asal dlm index.html (Boleh Edit Kelak mun mahu) -->
+    <style>
+        body { font-family: 'Montserrat', sans-serif; text-align: center; background-color: #f0f0f0; padding: 20px; }
+        #webcam-container { margin: 20px auto; width: 300px; height: 300px; background: black; border-radius: 15px; }
+        canvas { border-radius: 15px; }
+        #label-container { margin: 20px auto; font-size: 20px; font-weight: bold; padding: 15px; background: white; border-radius: 10px; }
+        #label-container div { margin: 5px 0; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
 
-    // ... kod template TM untuk Load Model & Setup Webcam ...
+    <h1>SMART i-C</h1>
+    <p>Sistem Pengesanan Kebersihan Bilik Darjah AI | AI Avengers</p>
+    
+    <button type="button" onclick="init()">Mula Imbasan</button>
+    <div id="webcam-container"></div>
+    <div id="label-container">Menunggu Imbasan...</div>
 
-    // --- Tambah/Edit fungsi predict() dlm index.html ---
-    async function predict() {
-        const prediction = await model.predict(webcam.canvas);
+    <!-- Kod Javascript Jangka Panjang dari TM + Kod Tambahan GAS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <script type="text/javascript">
+        // --- SMART i-C: Fungsi Penghantaran Data (GitHub -> GAS) ---
+        // Pembangunan oleh: AI AVENGERS
+
+        // ⚠️ 1. URL MODEL TM KITAK (TELAH DIKEMAS KINI)
+        // Kamek dah tampal URL model kitak sitok
+        const URL_MODEL_TM = "https://teachablemachine.withgoogle.com/models/8T1UNdXAx/"; 
         
-        // Cari keputusan paling tinggi
-        let highestPrediction = { className: "", probability: 0 };
-        for (let i = 0; i < maxPredictions; i++) {
-            if (prediction[i].probability > highestPrediction.probability) {
-                highestPrediction = prediction[i];
+        // ⚠️ 2. URL WEB APP GAS KITAK (TELAH DIKEMAS KINI)
+        // Kamek dah tampal URL Web App Google Apps Script kitak sitok
+        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzE_Hm9DdGq3ICixBiC_m78B0lnzW7tlQx1UebWT7-rD5kDbp4JN5WqZQbDTZWP8fHH/exec"; 
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        // --- Fungsi init() Asal dari TM dlm index.html dolok dolok ---
+        async function init() {
+            const modelURL = URL_MODEL_TM + "model.json";
+            const metadataURL = URL_MODEL_TM + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalPredictions();
+
+            const flip = true; // whether to flip the webcam
+            webcam = new tmImage.Webcam(300, 300, flip); // width, height, flip
+            await webcam.setup(); // request access to the webcam
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) { // and class labels
+                labelContainer.appendChild(document.createElement("div"));
             }
         }
 
-        // Tunjuk dlm Screen
-        labelContainer.innerHTML = highestPrediction.className + ": " + (highestPrediction.probability * 100).toFixed(1) + "%";
-
-        // --- Mulakan Proses Hantar ke Google Sheets ---
-        // Kitak boleh polah automatik mun keyakinan > 90%
-        if (highestPrediction.probability > 0.90 && (highestPrediction.className == "Bersih" || highestPrediction.className == "Kotor")) {
-            // Hantar automatik dlm background (uncomment mun perlu)
-            // await hantarDataKeSheets(highestPrediction.className, highestPrediction.probability);
+        async function loop() {
+            webcam.update(); // update the webcam frame
+            await predict();
+            window.requestAnimationFrame(loop);
         }
-    }
 
-    // --- Fungsi Lengkap Hantar ke GAS (doPost) ---
-    async function hantarDataKeSheets(statusAI, keyakinanAI) {
-        const payload = {
-            namaKelas: "Kelas Tidak Diketahui", // Kitak boleh polah dropdown kelak
-            status: statusAI,
-            keyakinan: (keyakinanAI * 100).toFixed(1),
-            catatan: "Imbasan automatik via SMART i-C Online"
-        };
+        // --- Fungsi predict() yang Telah Diubah Suai Utk Hantar Data ---
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            
+            // Cari keputusan AI paling tinggi
+            let highestPrediction = { className: "", probability: 0 };
+            for (let i = 0; i < maxPredictions; i++) {
+                if (prediction[i].probability > highestPrediction.probability) {
+                    highestPrediction = prediction[i];
+                }
+            }
 
-        try {
-            await fetch(GAS_WEB_APP_URL, {
-                method: "POST",
-                mode: "no-cors", // Penting untuk cross-origin GAS
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(payload)
-            });
-            console.log("Data berjaya dihantar ke Google Sheets via GAS!");
-        } catch (error) {
-            console.error("Ralat semasa menghantar data:", error);
+            // Tunjuk dlm Screen (Contoh: "Bersih: 95.5%")
+            labelContainer.innerHTML = highestPrediction.className + ": " + (highestPrediction.probability * 100).toFixed(1) + "%";
+
+            // --- Fasa 2.0: Proses Hantar Data ke Google Sheets Mun Perlu ---
+            // Kitak boleh polah automatik mun keyakinan AI > 90%
+            if (highestPrediction.probability > 0.90 && (highestPrediction.className == "Bersih" || highestPrediction.className == "Kotor")) {
+                // Hantar automatik dlm background (uncomment dlm bengkel esok mun perlu)
+                // await hantarDataKeSheets(highestPrediction.className, highestPrediction.probability);
+            }
         }
-    }
-</script>
+
+        // --- Fungsi Lengkap Hantar Data ke Sheets (Jambatan API doPost) ---
+        async function hantarDataKeSheets(statusAI, keyakinanAI) {
+            const payload = {
+                namaKelas: "Kelas Tidak Diketahui", // Kitak boleh polah Input Dropdown dlm HTML kelak dlm bengkel mun mahu
+                status: statusAI,
+                keyakinan: (keyakinanAI * 100).toFixed(1),
+                catatan: "Imbasan automatik via SMART i-C Online (v2.0)"
+            };
+
+            try {
+                await fetch(GAS_WEB_APP_URL, {
+                    method: "POST",
+                    mode: "no-cors", // Penting untuk cross-origin Google Apps Script
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload)
+                });
+                console.log("Data kebersihan berjaya dihantar ke Google Sheets via GAS!");
+                // alert("Rekod kebersihan BERJAYA disimpan dlm Google Sheets!");
+            } catch (error) {
+                console.error("Ralat semasa menghantar data:", error);
+            }
+        }
+    </script>
+</body>
+</html>
