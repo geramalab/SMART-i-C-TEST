@@ -1,0 +1,63 @@
+<div>Teachable Machine Image Model</div>
+<button type="button" onclick="init()">Start</button>
+<div id="webcam-container"></div>
+<div id="label-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script type="text/javascript">
+    // ⚠️ TAMPAL URL MODEL TM KITAK (DARI TEACHABLE MACHINE)
+    // Contoh: const URL_MODEL_TM = "https://teachablemachine.withgoogle.com/models/pS1_Xyz/";
+    const URL_MODEL_TM = "TAMBAL_URL_MODEL_TM_ANDA_SINI"; 
+    
+    // ⚠️ TAMPAL URL WEB APP GAS KITAK (DARI GAS DEPLOYMENT v1.0)
+    const GAS_WEB_APP_URL = "TAMBAL_URL_WEB_APP_GAS_ANDA_SINI"; 
+
+    // ... kod template TM untuk Load Model & Setup Webcam ...
+
+    // --- Tambah/Edit fungsi predict() dlm index.html ---
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        
+        // Cari keputusan paling tinggi
+        let highestPrediction = { className: "", probability: 0 };
+        for (let i = 0; i < maxPredictions; i++) {
+            if (prediction[i].probability > highestPrediction.probability) {
+                highestPrediction = prediction[i];
+            }
+        }
+
+        // Tunjuk dlm Screen
+        labelContainer.innerHTML = highestPrediction.className + ": " + (highestPrediction.probability * 100).toFixed(1) + "%";
+
+        // --- Mulakan Proses Hantar ke Google Sheets ---
+        // Kitak boleh polah automatik mun keyakinan > 90%
+        if (highestPrediction.probability > 0.90 && (highestPrediction.className == "Bersih" || highestPrediction.className == "Kotor")) {
+            // Hantar automatik dlm background (uncomment mun perlu)
+            // await hantarDataKeSheets(highestPrediction.className, highestPrediction.probability);
+        }
+    }
+
+    // --- Fungsi Lengkap Hantar ke GAS (doPost) ---
+    async function hantarDataKeSheets(statusAI, keyakinanAI) {
+        const payload = {
+            namaKelas: "Kelas Tidak Diketahui", // Kitak boleh polah dropdown kelak
+            status: statusAI,
+            keyakinan: (keyakinanAI * 100).toFixed(1),
+            catatan: "Imbasan automatik via SMART i-C Online"
+        };
+
+        try {
+            await fetch(GAS_WEB_APP_URL, {
+                method: "POST",
+                mode: "no-cors", // Penting untuk cross-origin GAS
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload)
+            });
+            console.log("Data berjaya dihantar ke Google Sheets via GAS!");
+        } catch (error) {
+            console.error("Ralat semasa menghantar data:", error);
+        }
+    }
+</script>
